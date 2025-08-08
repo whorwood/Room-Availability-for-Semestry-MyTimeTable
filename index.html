@@ -183,7 +183,7 @@
         let allDatesInData = new Set();
         let currentResults = [];
         let additionalRooms = [];
-        let currentSelections = {}; // Track current checkbox selections
+        let currentSelections = {};
         
         document.getElementById('csvFile').addEventListener('change', function(e) {
             const file = e.target.files[0];
@@ -210,12 +210,10 @@
                     .filter(room => room && !additionalRooms.includes(room) && !allRooms.includes(room));
                 
                 if (newRooms.length > 0) {
-                    // Save current selections before updating
                     saveCurrentSelections();
-                    
                     additionalRooms = [...additionalRooms, ...newRooms].sort((a, b) => a.localeCompare(b));
                     displayRoomFilter();
-                    restoreSelections(); // Restore selections after adding new rooms
+                    restoreSelections();
                     updateDisplayedRooms();
                     document.getElementById('additionalRooms').value = '';
                 }
@@ -234,7 +232,6 @@
                 if (currentSelections.hasOwnProperty(checkbox.value)) {
                     checkbox.checked = currentSelections[checkbox.value];
                 } else {
-                    // Newly added rooms should be checked by default
                     checkbox.checked = true;
                 }
             });
@@ -292,7 +289,7 @@
         function isWeekend(dateStr) {
             const date = new Date(dateStr);
             const day = date.getDay();
-            return day === 0 || day === 6; // Sunday or Saturday
+            return day === 0 || day === 6;
         }
 
         function setDefaultDateRange() {
@@ -402,7 +399,7 @@
             const dateRange = getDateRangeArray(startDate, endDate);
             const includeWeekends = document.getElementById('includeWeekends').checked;
             
-            // Filter dates based on weekend preference (only for regular rooms)
+            // Filter dates based on weekend preference
             const filteredDateRange = includeWeekends ? 
                 dateRange : 
                 dateRange.filter(date => !isWeekend(date));
@@ -418,11 +415,14 @@
                 roomHeader.textContent = `Room: ${room}` + (isAdditionalRoom ? ' (not in CSV)' : '');
                 
                 if (isAdditionalRoom) {
-                    // Additional rooms - show full date range regardless of weekend setting
+                    // Additional rooms - apply weekend filter to available dates
                     roomDiv.className = 'room-availability fully-available';
                     
-                    // Format all dates in the full range
-                    const formattedDates = dateRange.map(date => {
+                    // Filter dates based on weekend preference for additional rooms
+                    const availableDates = includeWeekends ? dateRange : dateRange.filter(date => !isWeekend(date));
+                    const availableDays = availableDates.length;
+                    
+                    const formattedDates = availableDates.map(date => {
                         const d = new Date(date);
                         return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth()+1).toString().padStart(2, '0')}/${d.getFullYear()}`;
                     });
@@ -430,7 +430,7 @@
                     currentResults.push({
                         Room: room,
                         AvailableDates: formattedDates.join(', '),
-                        NumberOfAvailableDays: dateRange.length,
+                        NumberOfAvailableDays: availableDays,
                         Status: 'Fully Available'
                     });
                     
@@ -441,21 +441,27 @@
                     
                     const info = document.createElement('div');
                     info.textContent = 'This room has no bookings in the uploaded CSV and is fully available for the selected period.';
+                    if (!includeWeekends) {
+                        info.textContent += ' (Weekends excluded)';
+                    }
                     
                     roomDiv.appendChild(roomHeader);
                     roomDiv.appendChild(statusText);
                     roomDiv.appendChild(info);
                     
-                    // Show full date list for additional rooms
+                    // Show filtered date list for additional rooms
                     const datesText = document.createElement('div');
-                    datesText.textContent = `Available for all ${dateRange.length} days:`;
+                    datesText.textContent = `Available for ${availableDays} days:`;
                     datesText.style.marginBottom = '5px';
+                    if (!includeWeekends) {
+                        datesText.textContent += ' (Weekends excluded)';
+                    }
                     roomDiv.appendChild(datesText);
                     
                     const list = document.createElement('ul');
                     list.style.paddingLeft = '20px';
                     
-                    dateRange.forEach(date => {
+                    availableDates.forEach(date => {
                         const item = document.createElement('li');
                         item.className = 'no-bookings';
                         item.textContent = new Date(date).toDateString();
@@ -464,9 +470,7 @@
                     
                     roomDiv.appendChild(list);
                 } else {
-                    // Process regular rooms with weekend filtering
-                    roomDiv.className = 'room-availability';
-                    
+                    // Process regular rooms
                     const bookedDates = availability[room];
                     const availableDates = filteredDateRange.filter(date => !bookedDates.includes(date));
                     const availableDays = availableDates.length;

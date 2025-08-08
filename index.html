@@ -6,6 +6,7 @@
     <title>Room Availability Checker</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <style>
+        /* Previous styles remain unchanged */
         body {
             font-family: Arial, sans-serif;
             max-width: 1200px;
@@ -274,7 +275,6 @@
             const filterDiv = document.getElementById('roomFilter');
             filterDiv.innerHTML = '';
             
-            // Combine all rooms (from CSV and additional) and sort alphabetically
             const allRoomsCombined = [...allRooms, ...additionalRooms]
                 .filter((value, index, self) => self.indexOf(value) === index)
                 .sort((a, b) => a.localeCompare(b));
@@ -348,7 +348,6 @@
             const resultsDiv = document.getElementById('availabilityResults');
             resultsDiv.innerHTML = '';
             
-            // Combine all selected rooms and sort alphabetically
             const allSelectedRooms = [
                 ...Object.keys(availability),
                 ...Object.keys(additionalRoomsData)
@@ -366,11 +365,10 @@
             }
             
             const dateRange = getDateRangeArray(startDate, endDate);
+            const totalDays = dateRange.length;
             
-            // Display all rooms in alphabetical order
             allSelectedRooms.forEach(room => {
                 const isAdditionalRoom = additionalRooms.includes(room) && !allRooms.includes(room);
-                
                 const roomDiv = document.createElement('div');
                 roomDiv.className = isAdditionalRoom ? 'room-availability fully-available' : 'room-availability';
                 
@@ -380,7 +378,7 @@
                 roomDiv.appendChild(roomHeader);
                 
                 if (isAdditionalRoom) {
-                    // Format all dates in range for fully available rooms
+                    // Additional rooms are always fully available
                     const formattedDates = dateRange.map(date => {
                         const d = new Date(date);
                         return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth()+1).toString().padStart(2, '0')}/${d.getFullYear()}`;
@@ -389,8 +387,8 @@
                     currentResults.push({
                         Room: room,
                         AvailableDates: formattedDates.join(', '),
-                        NumberOfAvailableDays: formattedDates.length,
-                        Status: 'Fully Available (not in CSV)'
+                        NumberOfAvailableDays: totalDays,
+                        Status: 'Fully Available'
                     });
                     
                     const info = document.createElement('div');
@@ -400,25 +398,35 @@
                     // Process regular rooms
                     const bookedDates = availability[room];
                     const availableDates = dateRange.filter(date => !bookedDates.includes(date));
+                    const availableDays = availableDates.length;
                     
                     const formattedDates = availableDates.map(date => {
                         const d = new Date(date);
                         return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth()+1).toString().padStart(2, '0')}/${d.getFullYear()}`;
                     });
                     
+                    // Determine status based on availability
+                    const status = availableDays === totalDays ? 'Fully Available' : 'Partially Available';
+                    
                     currentResults.push({
                         Room: room,
                         AvailableDates: formattedDates.join(', '),
-                        NumberOfAvailableDays: formattedDates.length,
-                        Status: 'Partially Available'
+                        NumberOfAvailableDays: availableDays,
+                        Status: status
                     });
                     
-                    if (availableDates.length === 0) {
+                    if (availableDays === 0) {
                         const noAvailability = document.createElement('div');
                         noAvailability.className = 'no-availability';
                         noAvailability.textContent = 'No available dates in selected range';
                         roomDiv.appendChild(noAvailability);
                     } else {
+                        const statusText = document.createElement('div');
+                        statusText.textContent = `Status: ${status}`;
+                        statusText.style.fontWeight = 'bold';
+                        statusText.style.marginBottom = '10px';
+                        roomDiv.appendChild(statusText);
+                        
                         const list = document.createElement('ul');
                         list.style.paddingLeft = '20px';
                         

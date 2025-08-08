@@ -274,6 +274,7 @@
             const filterDiv = document.getElementById('roomFilter');
             filterDiv.innerHTML = '';
             
+            // Combine all rooms (from CSV and additional) and sort alphabetically
             const allRoomsCombined = [...allRooms, ...additionalRooms]
                 .filter((value, index, self) => self.indexOf(value) === index)
                 .sort((a, b) => a.localeCompare(b));
@@ -347,11 +348,15 @@
             const resultsDiv = document.getElementById('availabilityResults');
             resultsDiv.innerHTML = '';
             
-            const sortedRooms = Object.keys(availability).sort();
-            const sortedAdditionalRooms = Object.keys(additionalRoomsData).sort();
+            // Combine all selected rooms and sort alphabetically
+            const allSelectedRooms = [
+                ...Object.keys(availability),
+                ...Object.keys(additionalRoomsData)
+            ].sort((a, b) => a.localeCompare(b));
+            
             currentResults = [];
             
-            if (sortedRooms.length === 0 && sortedAdditionalRooms.length === 0) {
+            if (allSelectedRooms.length === 0) {
                 const noResults = document.createElement('div');
                 noResults.className = 'no-availability';
                 noResults.textContent = 'No rooms selected or no data available';
@@ -362,63 +367,20 @@
             
             const dateRange = getDateRangeArray(startDate, endDate);
             
-            // Display regular rooms alphabetically
-            sortedRooms.forEach(room => {
+            // Display all rooms in alphabetical order
+            allSelectedRooms.forEach(room => {
+                const isAdditionalRoom = additionalRooms.includes(room) && !allRooms.includes(room);
+                
                 const roomDiv = document.createElement('div');
-                roomDiv.className = 'room-availability';
+                roomDiv.className = isAdditionalRoom ? 'room-availability fully-available' : 'room-availability';
                 
                 const roomHeader = document.createElement('div');
                 roomHeader.className = 'room-header';
-                roomHeader.textContent = `Room: ${room}`;
+                roomHeader.textContent = `Room: ${room}` + (isAdditionalRoom ? ' (not in CSV - fully available)' : '');
                 roomDiv.appendChild(roomHeader);
                 
-                const bookedDates = availability[room];
-                const availableDates = dateRange.filter(date => !bookedDates.includes(date));
-                
-                const formattedDates = availableDates.map(date => {
-                    const d = new Date(date);
-                    return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth()+1).toString().padStart(2, '0')}/${d.getFullYear()}`;
-                });
-                
-                currentResults.push({
-                    Room: room,
-                    AvailableDates: formattedDates.join(', '),
-                    NumberOfAvailableDays: formattedDates.length,
-                    Status: 'Partially Available'
-                });
-                
-                if (availableDates.length === 0) {
-                    const noAvailability = document.createElement('div');
-                    noAvailability.className = 'no-availability';
-                    noAvailability.textContent = 'No available dates in selected range';
-                    roomDiv.appendChild(noAvailability);
-                } else {
-                    const list = document.createElement('ul');
-                    list.style.paddingLeft = '20px';
-                    
-                    availableDates.forEach(date => {
-                        const item = document.createElement('li');
-                        item.className = 'no-bookings';
-                        item.textContent = new Date(date).toDateString();
-                        list.appendChild(item);
-                    });
-                    
-                    roomDiv.appendChild(list);
-                }
-                
-                resultsDiv.appendChild(roomDiv);
-            });
-            
-            // Display additional rooms alphabetically
-            if (sortedAdditionalRooms.length > 0) {
-                const additionalDiv = document.getElementById('additionalRoomsInfo');
-                additionalDiv.style.display = 'block';
-                const listDiv = document.getElementById('additionalRoomsList');
-                listDiv.innerHTML = '';
-                
-                const ul = document.createElement('ul');
-                
-                sortedAdditionalRooms.forEach(room => {
+                if (isAdditionalRoom) {
+                    // Format all dates in range for fully available rooms
                     const formattedDates = dateRange.map(date => {
                         const d = new Date(date);
                         return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth()+1).toString().padStart(2, '0')}/${d.getFullYear()}`;
@@ -431,23 +393,63 @@
                         Status: 'Fully Available (not in CSV)'
                     });
                     
-                    const li = document.createElement('li');
-                    li.textContent = `${room} - Fully available for entire period (not found in CSV)`;
-                    ul.appendChild(li);
-                    
-                    const roomDiv = document.createElement('div');
-                    roomDiv.className = 'room-availability fully-available';
-                    
-                    const roomHeader = document.createElement('div');
-                    roomHeader.className = 'room-header';
-                    roomHeader.textContent = `Room: ${room} (not in CSV - fully available)`;
-                    roomDiv.appendChild(roomHeader);
-                    
                     const info = document.createElement('div');
                     info.textContent = 'This room has no bookings in the uploaded CSV and is fully available for the selected period.';
                     roomDiv.appendChild(info);
+                } else {
+                    // Process regular rooms
+                    const bookedDates = availability[room];
+                    const availableDates = dateRange.filter(date => !bookedDates.includes(date));
                     
-                    resultsDiv.appendChild(roomDiv);
+                    const formattedDates = availableDates.map(date => {
+                        const d = new Date(date);
+                        return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth()+1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+                    });
+                    
+                    currentResults.push({
+                        Room: room,
+                        AvailableDates: formattedDates.join(', '),
+                        NumberOfAvailableDays: formattedDates.length,
+                        Status: 'Partially Available'
+                    });
+                    
+                    if (availableDates.length === 0) {
+                        const noAvailability = document.createElement('div');
+                        noAvailability.className = 'no-availability';
+                        noAvailability.textContent = 'No available dates in selected range';
+                        roomDiv.appendChild(noAvailability);
+                    } else {
+                        const list = document.createElement('ul');
+                        list.style.paddingLeft = '20px';
+                        
+                        availableDates.forEach(date => {
+                            const item = document.createElement('li');
+                            item.className = 'no-bookings';
+                            item.textContent = new Date(date).toDateString();
+                            list.appendChild(item);
+                        });
+                        
+                        roomDiv.appendChild(list);
+                    }
+                }
+                
+                resultsDiv.appendChild(roomDiv);
+            });
+            
+            // Update additional rooms info section
+            const additionalRoomsToShow = Object.keys(additionalRoomsData).sort();
+            if (additionalRoomsToShow.length > 0) {
+                const additionalDiv = document.getElementById('additionalRoomsInfo');
+                additionalDiv.style.display = 'block';
+                const listDiv = document.getElementById('additionalRoomsList');
+                listDiv.innerHTML = '';
+                
+                const ul = document.createElement('ul');
+                
+                additionalRoomsToShow.forEach(room => {
+                    const li = document.createElement('li');
+                    li.textContent = `${room} - Fully available for entire period (not found in CSV)`;
+                    ul.appendChild(li);
                 });
                 
                 listDiv.appendChild(ul);

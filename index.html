@@ -441,9 +441,6 @@
                     
                     const info = document.createElement('div');
                     info.textContent = 'This room has no bookings in the uploaded CSV and is fully available for the selected period.';
-                    if (!includeWeekends) {
-                        info.textContent += ' (Weekends excluded)';
-                    }
                     
                     roomDiv.appendChild(roomHeader);
                     roomDiv.appendChild(statusText);
@@ -578,3 +575,4 @@
     </script>
 </body>
 </html>
+

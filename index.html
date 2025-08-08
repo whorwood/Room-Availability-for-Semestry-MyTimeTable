@@ -122,6 +122,7 @@
         }
         #additionalRoomsInput {
             display: none;
+            margin-top: 20px;
         }
     </style>
 </head>
@@ -133,7 +134,7 @@
         <input type="file" id="csvFile" accept=".csv">
         <p>Upload a CSV file in the provided timetable format to check room availability.</p>
         
-        <div id="additionalRoomsInput" style="margin-top: 20px;">
+        <div id="additionalRoomsInput">
             <label for="additionalRooms">Add rooms not in CSV (comma separated):</label>
             <input type="text" id="additionalRooms" placeholder="Room 101, Room 102, etc." style="width: 300px; padding: 5px;">
             <button id="addRoomsBtn">Add Rooms</button>
@@ -198,13 +199,20 @@
         document.getElementById('addRoomsBtn').addEventListener('click', function() {
             const input = document.getElementById('additionalRooms').value;
             if (input.trim()) {
+                // Process new rooms
                 const newRooms = input.split(',')
                     .map(room => room.trim())
-                    .filter(room => room && !additionalRooms.includes(room));
+                    .filter(room => room && !additionalRooms.includes(room) && !allRooms.includes(room));
                 
                 if (newRooms.length > 0) {
+                    // Add new rooms and sort alphabetically
                     additionalRooms = [...additionalRooms, ...newRooms].sort((a, b) => a.localeCompare(b));
+                    
+                    // Update the display
+                    displayRoomFilter();
                     updateDisplayedRooms();
+                    
+                    // Clear the input
                     document.getElementById('additionalRooms').value = '';
                 }
             }
@@ -287,7 +295,7 @@
             const filterDiv = document.getElementById('roomFilter');
             filterDiv.innerHTML = '';
             
-            // Combine and sort all rooms (from CSV and additional)
+            // Combine all rooms (from CSV and additional) and sort alphabetically
             const allRoomsCombined = [...allRooms, ...additionalRooms]
                 .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
                 .sort((a, b) => a.localeCompare(b));

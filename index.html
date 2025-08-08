@@ -6,7 +6,6 @@
     <title>Room Availability Checker</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <style>
-        /* Previous styles remain the same */
         body {
             font-family: Arial, sans-serif;
             max-width: 1200px;
@@ -172,8 +171,29 @@
     </div>
 
     <script>
-        // Previous variable declarations remain the same
+        let allRooms = [];
+        let roomAvailabilityData = {};
+        let allDatesInData = new Set();
+        let currentResults = [];
+        let additionalRooms = [];
         
+        document.getElementById('csvFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            Papa.parse(file, {
+                header: true,
+                complete: function(results) {
+                    processData(results.data);
+                    document.getElementById('additionalRoomsInput').style.display = 'block';
+                },
+                error: function(error) {
+                    console.error("Error parsing CSV:", error);
+                    alert("Error parsing CSV file. Please check the format and try again.");
+                }
+            });
+        });
+
         document.getElementById('addRoomsBtn').addEventListener('click', function() {
             const input = document.getElementById('additionalRooms').value;
             if (input.trim()) {
@@ -190,11 +210,143 @@
             }
         });
 
+        function processData(data) {
+            const bookings = data.filter(row => row['Room(s)'] && row['Start date'] && row['End date']);
+            const rooms = {};
+            allDatesInData = new Set();
+            
+            bookings.forEach(booking => {
+                const roomNames = booking['Room(s)'].split(', ').map(room => room.trim());
+                const startDate = new Date(booking['Start date'] + 'T' + (booking['Start time'] || '00:00'));
+                const endDate = new Date(booking['End date'] + 'T' + (booking['End time'] || '23:59'));
+                
+                const datesInRange = getDatesInRange(startDate, endDate);
+                datesInRange.forEach(date => allDatesInData.add(date));
+                
+                roomNames.forEach(room => {
+                    if (!rooms[room]) {
+                        rooms[room] = new Set();
+                    }
+                    datesInRange.forEach(date => {
+                        rooms[room].add(date);
+                    });
+                });
+            });
+            
+            const processedRooms = {};
+            Object.keys(rooms).forEach(room => {
+                processedRooms[room] = Array.from(rooms[room]).sort();
+            });
+            
+            allRooms = Object.keys(processedRooms).sort();
+            roomAvailabilityData = processedRooms;
+            
+            setDefaultDateRange();
+            displayRoomFilter();
+            updateDisplayedRooms();
+            document.getElementById('results').style.display = 'block';
+        }
+
+        function getDatesInRange(startDate, endDate) {
+            const dates = [];
+            const currentDate = new Date(startDate);
+            
+            while (currentDate <= endDate) {
+                dates.push(currentDate.toISOString().split('T')[0]);
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+            
+            return dates;
+        }
+
+        function setDefaultDateRange() {
+            if (allDatesInData.size === 0) return;
+            
+            const datesArray = Array.from(allDatesInData).sort();
+            const minDate = datesArray[0];
+            const maxDate = datesArray[datesArray.length - 1];
+            
+            document.getElementById('startDate').value = minDate;
+            document.getElementById('endDate').value = maxDate;
+        }
+
+        function displayRoomFilter() {
+            const filterDiv = document.getElementById('roomFilter');
+            filterDiv.innerHTML = '';
+            
+            const allRoomsCombined = [...allRooms, ...additionalRooms]
+                .filter((value, index, self) => self.indexOf(value) === index)
+                .sort((a, b) => a.localeCompare(b));
+            
+            allRoomsCombined.forEach(room => {
+                const checkboxId = `room-${room.replace(/\W+/g, '-')}`;
+                const label = document.createElement('label');
+                label.htmlFor = checkboxId;
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = checkboxId;
+                checkbox.value = room;
+                checkbox.checked = true;
+                checkbox.addEventListener('change', updateDisplayedRooms);
+                
+                label.appendChild(checkbox);
+                label.appendChild(document.createTextNode(
+                    additionalRooms.includes(room) && !allRooms.includes(room) ? 
+                    `${room} (not in CSV)` : room
+                ));
+                
+                filterDiv.appendChild(label);
+            });
+            
+            document.getElementById('selectAll').addEventListener('click', function() {
+                document.querySelectorAll('#roomFilter input[type="checkbox"]').forEach(checkbox => {
+                    checkbox.checked = true;
+                });
+                updateDisplayedRooms();
+            });
+            
+            document.getElementById('deselectAll').addEventListener('click', function() {
+                document.querySelectorAll('#roomFilter input[type="checkbox"]').forEach(checkbox => {
+                    checkbox.checked = false;
+                });
+                updateDisplayedRooms();
+            });
+            
+            document.getElementById('applyDateRange').addEventListener('click', updateDisplayedRooms);
+            document.getElementById('exportCSV').addEventListener('click', exportToCSV);
+        }
+
+        function updateDisplayedRooms() {
+            const selectedRooms = Array.from(document.querySelectorAll('#roomFilter input[type="checkbox"]:checked'))
+                .map(checkbox => checkbox.value);
+            
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            
+            if (!startDate || !endDate) {
+                alert("Please select both start and end dates");
+                return;
+            }
+            
+            const filteredData = {};
+            const additionalRoomsData = {};
+            
+            selectedRooms.forEach(room => {
+                if (roomAvailabilityData[room]) {
+                    filteredData[room] = roomAvailabilityData[room];
+                } else if (additionalRooms.includes(room)) {
+                    additionalRoomsData[room] = [];
+                }
+            });
+            
+            displayResults(filteredData, additionalRoomsData, startDate, endDate);
+        }
+
         function displayResults(availability, additionalRoomsData, startDate, endDate) {
             const resultsDiv = document.getElementById('availabilityResults');
             resultsDiv.innerHTML = '';
             
-            // Process regular rooms first
             const sortedRooms = Object.keys(availability).sort();
             const sortedAdditionalRooms = Object.keys(additionalRoomsData).sort();
             currentResults = [];
@@ -210,7 +362,7 @@
             
             const dateRange = getDateRangeArray(startDate, endDate);
             
-            // Display regular rooms (from CSV)
+            // Display regular rooms alphabetically
             sortedRooms.forEach(room => {
                 const roomDiv = document.createElement('div');
                 roomDiv.className = 'room-availability';
@@ -257,7 +409,7 @@
                 resultsDiv.appendChild(roomDiv);
             });
             
-            // Display additional rooms (not in CSV)
+            // Display additional rooms alphabetically
             if (sortedAdditionalRooms.length > 0) {
                 const additionalDiv = document.getElementById('additionalRoomsInfo');
                 additionalDiv.style.display = 'block';
@@ -304,8 +456,36 @@
             }
         }
 
-        // Rest of the functions remain exactly the same as in the working version
+        function getDateRangeArray(startDateStr, endDateStr) {
+            const startDate = new Date(startDateStr);
+            const endDate = new Date(endDateStr);
+            const dates = [];
+            
+            const currentDate = new Date(startDate);
+            while (currentDate <= endDate) {
+                dates.push(currentDate.toISOString().split('T')[0]);
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+            
+            return dates;
+        }
+
+        function exportToCSV() {
+            if (currentResults.length === 0) {
+                alert("No data to export");
+                return;
+            }
+            
+            const csv = Papa.unparse(currentResults);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'room_availability.csv');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
     </script>
 </body>
 </html>
-
